@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SCHOTT DWH RunHub</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">DW</div>
+        <div>
+          <div class="brand-title">DWH RunHub</div>
+          <div class="brand-subtitle">Warehouse Control Center</div>
+        </div>
+      </div>
+      <input id="search" class="search" placeholder="Search DWH actions..." />
+      <nav id="categories" class="categories"></nav>
+    </aside>
+
+    <main class="main">
+      <header class="hero">
+        <div>
+          <h1 id="projectTitle">SCHOTT DWH Local Control Center</h1>
+          <p id="projectDescription">Control center for warehouse utilities, SQL helpers, metadata checks, and DWH diagnostics.</p>
+        </div>
+        <div class="status-pill">Local: http://localhost:3002</div>
+      </header>
+
+      <section class="grid-wrap">
+        <div>
+          <div class="section-header">
+            <h2>DWH Actions</h2>
+            <span id="actionCount"></span>
+          </div>
+          <div id="actions" class="cards"></div>
+        </div>
+
+        <div>
+          <div class="section-header">
+            <h2>Project Notes</h2>
+          </div>
+          <div class="info-card">
+            <h3>Purpose</h3>
+            <p>This RunHub is DWH-specific. It should not contain DA Stage 1/2/3 lifecycle logic.</p>
+            <div class="divider"></div>
+            <h3>Current safe step</h3>
+            <p>Validate the copied DWH utilities before any DA import refactor.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="terminal-card">
+        <div class="terminal-header">
+          <div>
+            <strong>Live Output</strong>
+            <span id="runStatus">Waiting</span>
+          </div>
+          <button id="clearLog" class="ghost-button">Clear</button>
+        </div>
+        <pre id="terminal" class="terminal">Run a DWH action to see logs here...</pre>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="confirmDialog" class="modal">
+    <form method="dialog">
+      <h3>Confirmation required</h3>
+      <p id="confirmText"></p>
+      <pre id="confirmCommand" class="command-preview-modal"></pre>
+      <label id="phraseLabel" class="field hidden">
+        Type confirmation phrase
+        <input id="confirmPhraseInput" />
+      </label>
+      <div class="modal-actions">
+        <button value="cancel" class="ghost-button">Cancel</button>
+        <button value="default" class="danger-button">Run</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/app.js"></script>
+</body>
+</html>
