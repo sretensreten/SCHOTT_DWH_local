@@ -1,0 +1,13 @@
+[
+  {
+    "id": "dwh-python-compile",
+    "title": "Compile DWH Python Files",
+    "category": "validation",
+    "description": "Compile core DWH Python files to catch syntax errors.",
+    "command": "python",
+    "args": ["-m", "py_compile", "DWH/connectors/bigquery_client.py", "DWH/utils/sql_utils.py"],
+    "inputs": [],
+    "risk": "low",
+    "requiresConfirmation": false
+  }
+]

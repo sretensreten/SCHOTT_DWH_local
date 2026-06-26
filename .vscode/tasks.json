@@ -1,0 +1,25 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "RunHub: npm run runhub",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "runhub"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false,
+        "focus": true
+      },
+      "problemMatcher": [],
+      "detail": "Starts DWH RunHub local dashboard using npm run runhub."
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "schott-dwh-local-runhub",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local DWH control center for SCHOTT warehouse utilities.",
+  "scripts": {
+    "runhub": "node .runhub/server/runhub-server.js",
+    "dashboard": "node .runhub/server/runhub-server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

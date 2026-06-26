@@ -1,0 +1,12 @@
+{
+  "id": "schott-dwh-local",
+  "title": "SCHOTT DWH Local Control Center",
+  "description": "Control center for warehouse utilities, SQL helpers, metadata checks, and DWH diagnostics.",
+  "defaultPort": 3002,
+  "projectType": "DWH_WarehouseUtilities",
+  "standardSpecificSplit": {
+    "standard": ".runhub/",
+    "specific": ".runhub.project/",
+    "existingLogic": ["DWH/", "tools/", "docs/"]
+  }
+}

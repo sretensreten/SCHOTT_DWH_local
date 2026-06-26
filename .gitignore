@@ -1,0 +1,41 @@
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+.venv-linux/
+venv/
+env/
+
+# Secrets / credentials
+.env
+.env.*
+!.env.example
+service-account*.json
+credentials*.json
+token*.json
+*.key
+*.pem
+
+# Generated outputs / backups / snapshots
+outputs/
+backups/
+snapshot/
+context_bundle/
+DWH/outputs/
+DWH/backups/
+.runhub.project/runs/
+.runhub.project/snapshot/
+
+# Logs
+*.log
+*.stdout.txt
+*.stderr.txt
+
+# Temporary folders
+tmp/
+temp/
