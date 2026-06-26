@@ -5,7 +5,39 @@
     "category": "validation",
     "description": "Compile core DWH Python files to catch syntax errors.",
     "command": "python",
-    "args": ["-m", "py_compile", "DWH/connectors/bigquery_client.py", "DWH/utils/sql_utils.py"],
+    "args": [
+      "-m",
+      "py_compile",
+      "DWH/connectors/bigquery_client.py",
+      "DWH/utils/sql_utils.py"
+    ],
+    "inputs": [],
+    "risk": "low",
+    "requiresConfirmation": false
+  },
+  {
+    "id": "dwh-snapshot-validate",
+    "title": "Validate DWH Snapshot",
+    "category": "validation",
+    "description": "Run DWH snapshot validation without writing snapshot files.",
+    "command": "python",
+    "args": [
+      "tools/dwh_snapshot.py",
+      "--validate-only"
+    ],
+    "inputs": [],
+    "risk": "low",
+    "requiresConfirmation": false
+  },
+  {
+    "id": "dwh-snapshot-create",
+    "title": "Create DWH Snapshot",
+    "category": "tools",
+    "description": "Create a DWH project snapshot under ignored snapshot/dwh folders.",
+    "command": "python",
+    "args": [
+      "tools/dwh_snapshot.py"
+    ],
     "inputs": [],
     "risk": "low",
     "requiresConfirmation": false
