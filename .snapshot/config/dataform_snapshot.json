@@ -1,0 +1,94 @@
+{
+  "project_label": "dataform",
+  "output_folder": "snapshot_dataform",
+  "full_snapshot_file_name": "dataform_project_full_snapshot.txt",
+  "exclude_dirs": [
+    "snapshot",
+    ".git",
+    "node_modules",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "venv",
+    "env"
+  ],
+  "exclude_files": [
+    ".gitkeep",
+    ".env",
+    "local.env"
+  ],
+  "groups": {
+    "assert": {
+      "dirs": [
+        "definitions/assert",
+        "assert"
+      ],
+      "extensions": [
+        ".sqlx"
+      ]
+    },
+    "audits": {
+      "dirs": [
+        "definitions/audits",
+        "audits"
+      ],
+      "extensions": [
+        ".sqlx",
+        ".sql"
+      ]
+    },
+    "stg": {
+      "dirs": [
+        "definitions/stg",
+        "stg"
+      ],
+      "extensions": [
+        ".sqlx"
+      ]
+    },
+    "int": {
+      "dirs": [
+        "definitions/int",
+        "int"
+      ],
+      "extensions": [
+        ".sqlx"
+      ]
+    },
+    "pro": {
+      "dirs": [
+        "definitions/pro",
+        "pro"
+      ],
+      "extensions": [
+        ".sqlx"
+      ]
+    },
+    "legacy": {
+      "dirs": [
+        "definitions"
+      ],
+      "extensions": [
+        ".sqlx"
+      ],
+      "exclude_subdirs": true
+    },
+    "support": {
+      "dirs": [
+        "includes"
+      ],
+      "extensions": [
+        ".js"
+      ],
+      "standalone_files": [
+        "workflow_settings.yaml"
+      ]
+    }
+  },
+  "agents": {
+    "enabled": true,
+    "output_file_name": "dataform_agents_snapshot.txt"
+  }
+}

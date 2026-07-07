@@ -1,7 +1,0 @@
-[
-  { "id": "overview", "title": "Overview", "icon": "âŒ‚" },
-  { "id": "validation", "title": "Validation", "icon": "âœ“" },
-  { "id": "metadata", "title": "Metadata", "icon": "â–£" },
-  { "id": "sql", "title": "SQL Utilities", "icon": "SQL" },
-  { "id": "tools", "title": "Tools", "icon": "âš™" }
-]

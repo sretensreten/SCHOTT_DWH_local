@@ -1,0 +1,121 @@
+{
+  "project_label": "dbt",
+  "output_folder": "snapshot_dbt",
+  "full_snapshot_file_name": "dbt_project_full_snapshot.txt",
+  "exclude_dirs": [
+    "snapshot",
+    ".git",
+    "logs",
+    "target",
+    "dbt_packages",
+    "node_modules",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "venv",
+    "env"
+  ],
+  "exclude_files": [
+    ".gitkeep",
+    "profiles.yml",
+    "local.env",
+    ".env"
+  ],
+  "groups": {
+    "staging": {
+      "dirs": [
+        "models/staging"
+      ],
+      "extensions": [
+        ".sql",
+        ".yml",
+        ".yaml"
+      ]
+    },
+    "intermediate": {
+      "dirs": [
+        "models/intermediate"
+      ],
+      "extensions": [
+        ".sql",
+        ".yml",
+        ".yaml"
+      ]
+    },
+    "marts": {
+      "dirs": [
+        "models/marts"
+      ],
+      "extensions": [
+        ".sql",
+        ".yml",
+        ".yaml"
+      ]
+    },
+    "snapshots": {
+      "dirs": [
+        "snapshots"
+      ],
+      "extensions": [
+        ".sql",
+        ".yml",
+        ".yaml"
+      ]
+    },
+    "macros": {
+      "dirs": [
+        "macros"
+      ],
+      "extensions": [
+        ".sql"
+      ]
+    },
+    "tests": {
+      "dirs": [
+        "tests"
+      ],
+      "extensions": [
+        ".sql",
+        ".yml",
+        ".yaml"
+      ]
+    },
+    "analyses": {
+      "dirs": [
+        "analyses"
+      ],
+      "extensions": [
+        ".sql",
+        ".yml",
+        ".yaml"
+      ]
+    },
+    "seeds": {
+      "dirs": [
+        "seeds"
+      ],
+      "extensions": [
+        ".csv",
+        ".yml",
+        ".yaml"
+      ],
+      "csv_preview_rows": 50
+    },
+    "config": {
+      "standalone_files": [
+        "dbt_project.yml",
+        "packages.yml",
+        "dependencies.yml",
+        "selectors.yml",
+        "dbt-requirements.txt",
+        "README.md"
+      ]
+    }
+  },
+  "agents": {
+    "enabled": true,
+    "output_file_name": "dbt_agents_snapshot.txt"
+  }
+}
