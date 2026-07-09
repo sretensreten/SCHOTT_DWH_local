@@ -40,3 +40,9 @@ DWH/backups/
 # Temporary folders
 tmp/
 temp/
+
+# Other folders
+.docs/
+
+# other files
+__init__.py
