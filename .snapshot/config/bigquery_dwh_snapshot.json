@@ -40,7 +40,7 @@
       "exclude_folders": ["DWH/data_profiling/outputs"],
       "include_files": [],
       "exclude_files": [],
-      "output_file_name": "bigquery_dwh_source_snapshot.txt",
+      "output_file_name": "bigquery_dwh_python_snapshot.txt",
       "include_in_full_snapshot": true
     },
     "runhub": {
@@ -59,6 +59,35 @@
       "include_files": [],
       "exclude_files": [],
       "output_file_name": "bigquery_dwh_runhub_snapshot.txt",
+      "include_in_full_snapshot": false
+    },
+    "profile": {
+      "dirs": [
+        "DWH/data_profiling/outputs/profiles/bigquery"
+      ],
+      "extensions": [
+        ".json"
+      ],
+      "include_folders": [],
+      "exclude_folders": [],
+      "include_files": [],
+      "exclude_files": ["_profile_summary.json"],
+      "output_file_name": "bigquery_dwh_tables_profile_snapshot.txt",
+      "include_in_full_snapshot": false
+    },
+    "snapshot": {
+      "dirs": [
+        ".snapshot"
+      ],
+      "extensions": [
+        ".json",
+        ".py"
+      ],
+      "include_folders": [],
+      "exclude_folders": [],
+      "include_files": [],
+      "exclude_files": [],
+      "output_file_name": "bigquery_dwh_script_for_snapshot.txt",
       "include_in_full_snapshot": false
     }
   },

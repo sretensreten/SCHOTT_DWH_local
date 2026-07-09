@@ -1,0 +1,68 @@
+{
+  "connection": {
+    "method": "application_default_credentials",
+    "project_id_env": "GCP_PROJECT_ID",
+    "dataset_id_env": "BQ_DATASET_ID",
+    "env_file": ".env"
+  },
+  "bigquery": {
+    "project_id": "",
+    "location": "",
+    "datasets": [
+      "pro_pharma",
+      "pro_schott",
+      "int_core",
+      "int_mst",
+      "int_ref",
+      "stg",
+      "Dashboard_Advanced_Optics",
+      "Dashboard_Ceran",
+      "Dashboard_Electronic_Packaging",
+      "Dashboard_Food_Display",
+      "Dashboard_Hometech",
+      "Dashboard_Lighting",
+      "Dashboard_Pharma",
+      "Dashboard_Tubing"
+    ]
+  },
+  "paths": {
+    "output_dir": "DWH/data_profiling/outputs/profiles/bigquery",
+    "dbt_manifest_path": ""
+  },
+  "profiling": {
+    "top_n": 10,
+    "sample_limit": 10000,
+    "include_tables": true,
+    "include_views": false,
+    "max_objects_per_run": 10,
+    "query_timeout_seconds": 900,
+    "use_partition_filter": true,
+    "partition_window_days": 90,
+    "apply_window_to_views": false,
+    "view_date_filter_columns": [
+      "event_date",
+      "date",
+      "created_date",
+      "snapshot_date"
+    ]
+  },
+  "filters": {
+    "name_contains": "",
+    "name_starts_with": "",
+    "dbt_tags": []
+  },
+  "reports": {
+    "input_dir": "DWH/data_profiling/outputs/profiles/bigquery",
+    "output_dir": "DWH/data_profiling/outputs/reports",
+    "output_file": "data_profile_report.html",
+    "title": "BigQuery Data Profile Report",
+    "company_label": "DWH Data Profiling",
+    "show_top_values_limit": 20
+  },
+  "cost_control": {
+    "dry_run_before_execute": true,
+    "max_bytes_billed": 10737418240,
+    "show_estimated_bytes": true,
+    "stop_if_dry_run_exceeds_limit": true
+  }
+}
