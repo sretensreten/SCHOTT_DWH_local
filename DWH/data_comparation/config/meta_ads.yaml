@@ -7,11 +7,11 @@ project_env: GCP_PROJECT_ID
 connection:
   env_file: .env
 left:
-  namespace: int_core
-  object: dev_int_core__meta_ads_campaign_performance_legacy_for_comparation_delete_after_use
+  namespace: audit
+  object: dev_audit__meta_ads__legacy_aligned
 right:
-  namespace: PMU_KPI_Cockpit
-  object: MetaAds_Cost_Data_AGG
+  namespace: audit
+  object: dev_audit__meta_ads__refactor_aligned
 join_keys:
 - event_date
 - campaign_name_most_recent
