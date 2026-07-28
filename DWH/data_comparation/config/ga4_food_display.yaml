@@ -1,0 +1,66 @@
+provider: bigquery
+comparison_mode: keyed
+comparison_name: ga4_food_display
+description: Compare audit.dev_audit__ga4_food_display__legacy_aligned with audit.dev_audit__ga4_food_display__refactor_aligned
+
+project_env: GCP_PROJECT_ID
+
+connection:
+  env_file: .env
+
+left:
+  namespace: audit
+  object: dev_audit__ga4_food_display__legacy_aligned
+
+right:
+  namespace: audit
+  object: dev_audit__ga4_food_display__refactor_aligned
+
+join_keys:
+  - event_date
+  - event_name
+  - source_property
+
+columns:
+  mode: all_common
+  include: []
+  exclude: []
+
+filters:
+  left: []
+  right: []
+
+date_filter:
+  left_field: event_date
+  right_field: event_date
+  from: '2025-10-01'
+  to: '2025-12-31'
+
+comparison_options:
+  numeric_tolerance:
+    mode: absolute
+    value: 0.001
+  strings:
+    trim: false
+    case_sensitive: true
+    empty_string_equals_null: false
+
+sample:
+  max_problem_rows: 10
+
+values:
+  show_values: true
+  mask_sensitive_values: false
+
+execution:
+  query_timeout_seconds: 900
+
+provider_options:
+  dry_run_before_execute: true
+  maximum_bytes_billed_gb: 25.0
+  stop_if_dry_run_exceeds_limit: true
+
+tags:
+  - validation
+  - ga4
+  - food_display
