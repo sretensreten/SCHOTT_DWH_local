@@ -15,7 +15,7 @@ BASE = Path("DWH") / "data_comparation"
 CONFIG_DIR = BASE / "config"
 RESULT_DIR = BASE / "outputs" / "comparison_results"
 REPORT_DIR = BASE / "outputs" / "reports"
-VERSION = "provider-architecture-20260713_02"
+VERSION = "provider-architecture-20260805_03"
 
 
 def ask(label: str, default: str = "") -> str:
@@ -80,10 +80,30 @@ def wizard() -> Path | None:
     right = provider.get_object(right_sel["namespace"], right_sel["name"])
     ls, rs = {c.name.lower(): c for c in left.columns}, {c.name.lower(): c for c in right.columns}
     common = [ls[k] for k in sorted(ls.keys() & rs.keys()) if ls[k].data_type == rs[k].data_type and ls[k].mode == rs[k].mode]
-    keys = choose("Choose unique join key field(s)", common, lambda c: f"{c.name} | {c.data_type} | {c.mode}", multi=True)
-    if not keys:
-        print("Join key is required.")
-        return None
+    technical = [c.name for c in common if any(x in c.name.lower() for x in ["load", "batch", "etl", "insert", "update", "audit", "run_id"])]
+    excluded = technical if technical and yes_no(f"Exclude detected technical columns ({', '.join(technical)})?", True) else []
+
+    print("\nJoin key mode")
+    print("============= ")
+    print("[1] Select join key field(s) manually")
+    print("[2] Use all shared dimension fields automatically")
+    join_key_mode = "all_dimensions" if ask("Selection", "1") == "2" else "manual"
+    if join_key_mode == "manual":
+        keys = choose("Choose unique join key field(s)", common, lambda c: f"{c.name} | {c.data_type} | {c.mode}", multi=True)
+        if not keys:
+            print("Join key is required.")
+            return None
+    else:
+        dimension_types = {"STRING", "DATE", "DATETIME", "TIME", "TIMESTAMP", "BOOL", "BOOLEAN"}
+        excluded_names = {name.lower() for name in excluded}
+        keys = [c for c in common if c.data_type.upper() in dimension_types and c.name.lower() not in excluded_names]
+        if not keys:
+            print("No shared dimension fields are available after exclusions.")
+            return None
+        print("\nAutomatically selected dimension fields:")
+        for key in keys:
+            print(f"- {key.name} | {key.data_type} | {key.mode}")
+
     date_common = [c for c in common if c.data_type in {"DATE", "DATETIME", "TIMESTAMP"}]
     date_filter = {}
     if date_common and yes_no("Apply date filter?", True):
@@ -96,20 +116,19 @@ def wizard() -> Path | None:
             val = ask(f"{side.upper()} condition without WHERE")
             if val:
                 filters[side].append(val)
-    technical = [c.name for c in common if any(x in c.name.lower() for x in ["load", "batch", "etl", "insert", "update", "audit", "run_id"])]
-    excluded = technical if technical and yes_no(f"Exclude detected technical columns ({', '.join(technical)})?", True) else []
     default_name = safe_name(f"{left.schema}_{left.name}_vs_{right.schema}_{right.name}")
     name = safe_name(ask("Config name", default_name))
     config = {
         "provider": "bigquery",
         "comparison_mode": "keyed",
+        "join_key_mode": join_key_mode,
         "comparison_name": name,
         "description": ask("Description", f"Compare {left.schema}.{left.name} with {right.schema}.{right.name}"),
         "project_env": "GCP_PROJECT_ID",
         "connection": {"env_file": ".env"},
         "left": {"namespace": left.schema, "object": left.name},
         "right": {"namespace": right.schema, "object": right.name},
-        "join_keys": [x.name for x in keys],
+        "join_keys": [x.name for x in keys] if join_key_mode == "manual" else [],
         "columns": {"mode": "all_common", "include": [], "exclude": excluded},
         "filters": filters,
         "date_filter": {k: v for k, v in date_filter.items() if v},
@@ -154,7 +173,7 @@ def execute(paths: List[Path], html: bool) -> int:
             left = provider.get_object(left_cfg.get("namespace") or left_cfg.get("dataset"), left_cfg["object"])
             right = provider.get_object(right_cfg.get("namespace") or right_cfg.get("dataset"), right_cfg["object"])
             plan = schema_plan(left, right, cfg)
-            item.update({"left_object": f"{left.catalog}.{left.schema}.{left.name}", "right_object": f"{right.catalog}.{right.schema}.{right.name}", "left_object_type": left.object_type, "right_object_type": right.object_type, "join_keys": plan.get("join_keys"), "schema": plan, "schema_status": plan["schema_status"], "key_status": "FAILED" if plan["blockers"] else "PENDING", "data_status": "NOT_RUN"})
+            item.update({"left_object": f"{left.catalog}.{left.schema}.{left.name}", "right_object": f"{right.catalog}.{right.schema}.{right.name}", "left_object_type": left.object_type, "right_object_type": right.object_type, "join_key_mode": plan.get("join_key_mode"), "join_keys": plan.get("join_keys"), "schema": plan, "schema_status": plan["schema_status"], "key_status": "FAILED" if plan["blockers"] else "PENDING", "data_status": "NOT_RUN"})
             if plan["blockers"]:
                 item["execution_status"] = "BLOCKED_SCHEMA_OR_KEY"
                 item["errors"] = plan["blockers"]
@@ -251,3 +270,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

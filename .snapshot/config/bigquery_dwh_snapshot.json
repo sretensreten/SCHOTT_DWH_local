@@ -17,7 +17,9 @@
     ".git",
     ".kilo",
     ".vscode",
-    ".docs"
+    ".docs",
+    "DWH/data_comparation/outputs",
+    "DWH/data_comparation/config"
   ],
   "exclude_files": [
     ".gitkeep",
@@ -37,7 +39,7 @@
         ".json"
       ],
       "include_folders": [],
-      "exclude_folders": ["DWH/data_profiling/outputs"],
+      "exclude_folders": ["DWH/data_comparation/outputs"],
       "include_files": [],
       "exclude_files": [],
       "output_file_name": "bigquery_dwh_python_snapshot.txt",

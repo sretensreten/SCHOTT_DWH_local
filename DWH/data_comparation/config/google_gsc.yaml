@@ -11,6 +11,8 @@ left:
 right:
   namespace: audit
   object: dev_audit__google_gsc__refactor_aligned
+
+join_key_mode: manual
 join_keys:
 - surrogate_key
 columns:

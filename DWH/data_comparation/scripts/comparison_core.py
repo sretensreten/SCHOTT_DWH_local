@@ -68,10 +68,26 @@ def plain(value: Any) -> Any:
 def schema_plan(left: ObjectInfo, right: ObjectInfo, config: Dict[str, Any]) -> Dict[str, Any]:
     ls = {c.name.lower(): c for c in left.columns}
     rs = {c.name.lower(): c for c in right.columns}
-    keys = [str(x) for x in config.get("join_keys", [])]
     mode = str(config.get("comparison_mode", "keyed")).lower()
+    join_key_mode = str(config.get("join_key_mode", "manual")).lower()
     column_cfg = config.get("columns", {}) or {}
     excluded_cfg = {str(x).lower() for x in column_cfg.get("exclude", [])}
+    if join_key_mode == "manual":
+        keys = [str(x) for x in config.get("join_keys", [])]
+    elif join_key_mode == "all_dimensions":
+        dimension_types = {"STRING", "DATE", "DATETIME", "TIME", "TIMESTAMP", "BOOL", "BOOLEAN"}
+        keys = [
+            ls[key].name
+            for key in sorted(ls.keys() & rs.keys())
+            if ls[key].data_type == rs[key].data_type
+            and ls[key].mode == rs[key].mode
+            and ls[key].data_type.upper() in dimension_types
+            and ls[key].comparable
+            and rs[key].comparable
+            and key not in excluded_cfg
+        ]
+    else:
+        keys = []
     selected_cfg = {str(x).lower() for x in column_cfg.get("include", [])}
     column_mode = str(column_cfg.get("mode", "all_common")).lower()
 
@@ -90,6 +106,10 @@ def schema_plan(left: ObjectInfo, right: ObjectInfo, config: Dict[str, Any]) -> 
             compatible.append(l)
 
     blockers = []
+    if join_key_mode not in {"manual", "all_dimensions"}:
+        blockers.append(
+            f"Unsupported join_key_mode '{join_key_mode}'. Use 'manual' or 'all_dimensions'."
+        )
     for key in keys:
         lk = ls.get(key.lower())
         rk = rs.get(key.lower())
@@ -130,9 +150,11 @@ def schema_plan(left: ObjectInfo, right: ObjectInfo, config: Dict[str, Any]) -> 
         "compared_columns": compared,
         "excluded_columns": excluded,
         "join_keys": keys,
+        "join_key_mode": join_key_mode,
     }
 
 
 def save_json(data: Dict[str, Any], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+

@@ -16,10 +16,7 @@ right:
   namespace: audit
   object: dev_audit__ga4_hometech__refactor_aligned
 
-join_keys:
-  - event_date
-  - event_name
-  - source_property
+join_key_mode: all_dimensions
 
 columns:
   mode: all_common

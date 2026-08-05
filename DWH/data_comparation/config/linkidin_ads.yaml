@@ -12,6 +12,8 @@ left:
 right:
   namespace: audit
   object: dev_audit__linkedin_ads__refactor_aligned
+
+join_key_mode: manual
 join_keys:
 - business_unit
 - campaign_group_name
