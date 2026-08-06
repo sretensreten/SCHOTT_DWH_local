@@ -116,9 +116,16 @@ class BigQueryProvider:
 
     def _source(self, side: str, obj: ObjectInfo, config: Dict[str, Any], selected: List[str], keys: List[str]) -> str:
         where_clause = self._where(side, obj, config)
-        names = list(dict.fromkeys(keys + selected))
-        fields = ", ".join(self.qi(name) for name in names)
-        base = f"SELECT {fields} FROM {self.ref(obj)}" + (f" WHERE {where_clause}" if where_clause else "")
+        if str(config.get("join_key_mode", "manual")).lower() == "all_dimensions":
+            measures = {str(x).lower() for x in config.get("aggregate_measures", [])}
+            selected_measures = [name for name in selected if name.lower() in measures]
+            dimension_fields = ", ".join(self.qi(name) for name in keys)
+            measure_fields = ", ".join(f"SUM({self.qi(name)}) AS {self.qi(name)}" for name in selected_measures)
+            base = f"SELECT {dimension_fields}, {measure_fields} FROM {self.ref(obj)}" + (f" WHERE {where_clause}" if where_clause else "") + f" GROUP BY {dimension_fields}"
+        else:
+            names = list(dict.fromkeys(keys + selected))
+            fields = ", ".join(self.qi(name) for name in names)
+            base = f"SELECT {fields} FROM {self.ref(obj)}" + (f" WHERE {where_clause}" if where_clause else "")
         key_expression = self._key_string("s", keys)
         return (
             "SELECT s.*, 1 AS __row_marker,\n"
@@ -256,10 +263,70 @@ CROSS JOIN field_counts
 CROSS JOIN samples
 """.strip()
 
+    def _all_values_source(self, side: str, obj: ObjectInfo, config: Dict[str, Any], columns: List[Dict[str, Any]]) -> str:
+        where_clause = self._where(side, obj, config)
+        names = ", ".join(self.qi(column["name"]) for column in columns)
+        base = f"SELECT {names} FROM {self.ref(obj)}" + (f" WHERE {where_clause}" if where_clause else "")
+        fields = ", ".join(f"s.{self.qi(column['name'])} AS {self.qi(column['name'])}" for column in columns)
+        row_value = f"TO_JSON_STRING(STRUCT({fields}))"
+        return (f"SELECT row_value, TO_HEX(SHA256(row_value)) AS row_hash, COUNT(*) AS occurrence_count\n"
+                f"FROM (SELECT {row_value} AS row_value FROM ({base}) AS s)\n"
+                f"GROUP BY row_value, row_hash")
+
+    def generate_all_values_sql(self, config: Dict[str, Any], left: ObjectInfo, right: ObjectInfo, plan: Dict[str, Any]) -> str:
+        columns = plan["compared_columns"]
+        if not columns:
+            raise ValueError("all_values mode requires at least one compatible common column.")
+        left_source = self._all_values_source("left", left, config, columns)
+        right_source = self._all_values_source("right", right, config, columns)
+        sample_limit = int(config.get("comparison_options", {}).get("sample", {}).get("max_problem_rows", 10))
+        return f"""
+WITH left_rows AS ({left_source}),
+right_rows AS ({right_source}),
+row_comparison AS (
+  SELECT COALESCE(l.row_value, r.row_value) AS row_value,
+         COALESCE(l.occurrence_count, 0) AS left_occurrence_count,
+         COALESCE(r.occurrence_count, 0) AS right_occurrence_count
+  FROM left_rows l FULL OUTER JOIN right_rows r
+    ON l.row_hash = r.row_hash AND l.row_value = r.row_value
+),
+metrics AS (
+  SELECT COALESCE(SUM(left_occurrence_count), 0) AS left_row_count,
+         COALESCE(SUM(right_occurrence_count), 0) AS right_row_count,
+         COALESCE(SUM(GREATEST(left_occurrence_count-right_occurrence_count,0)), 0) AS missing_in_right_count,
+         COALESCE(SUM(GREATEST(right_occurrence_count-left_occurrence_count,0)), 0) AS missing_in_left_count,
+         COALESCE(SUM(LEAST(left_occurrence_count,right_occurrence_count)), 0) AS matched_key_count
+  FROM row_comparison
+),
+samples AS (
+  SELECT ARRAY(SELECT AS STRUCT
+    CASE WHEN left_occurrence_count=0 THEN 'MISSING_IN_LEFT'
+         WHEN right_occurrence_count=0 THEN 'MISSING_IN_RIGHT'
+         ELSE 'ROW_COUNT_MISMATCH' END AS difference_type,
+    row_value AS business_key,
+    [STRUCT('occurrence_count' AS field, CAST(left_occurrence_count AS STRING) AS left_value,
+            CAST(right_occurrence_count AS STRING) AS right_value)] AS differences
+  FROM row_comparison WHERE left_occurrence_count != right_occurrence_count
+  ORDER BY ABS(left_occurrence_count-right_occurrence_count) DESC, row_value LIMIT {sample_limit}) AS values
+)
+SELECT metrics.left_row_count, metrics.right_row_count,
+  0 AS left_null_key_count, 0 AS right_null_key_count,
+  0 AS left_duplicate_key_count, 0 AS right_duplicate_key_count,
+  [] AS left_duplicate_samples, [] AS right_duplicate_samples,
+  metrics.missing_in_right_count, metrics.missing_in_left_count, metrics.matched_key_count,
+  0 AS rows_with_differences_count, 0 AS total_field_differences,
+  [] AS field_difference_counts, samples.values AS problem_rows_sample
+FROM metrics CROSS JOIN samples
+""".strip()
+
     def compare(self, config: Dict[str, Any], left: ObjectInfo, right: ObjectInfo, plan: Dict[str, Any]) -> Dict[str, Any]:
-        if config.get("comparison_mode", "keyed") != "keyed":
-            raise NotImplementedError("Only keyed mode is implemented in this version.")
-        sql = self.generate_keyed_sql(config, left, right, plan)
+        mode = str(config.get("join_key_mode", "manual")).lower()
+        if mode == "all_values":
+            sql = self.generate_all_values_sql(config, left, right, plan)
+        else:
+            if config.get("comparison_mode", "keyed") != "keyed":
+                raise NotImplementedError("Only keyed and all_values modes are implemented.")
+            sql = self.generate_keyed_sql(config, left, right, plan)
         options = config.get("provider_options", {})
         max_bytes = int(float(options.get("maximum_bytes_billed_gb", 25)) * 1024**3)
         estimated = None
@@ -272,3 +339,4 @@ CROSS JOIN samples
         rows = list(self.client.query(sql, job_config=job_config).result(timeout=int(config.get("execution", {}).get("query_timeout_seconds", 900))))
         result = plain(rows[0]) if rows else {}
         return {"execution_status": "COMPLETED", "estimated_bytes": estimated, "max_bytes_billed": max_bytes, "result": result, "sqls": [{"name": "comparison_sql", "sql": sql}]}
+

@@ -1,5 +1,7 @@
 provider: bigquery
 comparison_mode: keyed
+join_key_mode: all_values
+
 comparison_name: ga4_hometech_ceran
 description: Compare audit.dev_audit__ga4_hometech_ceran__legacy_aligned with audit.dev_audit__ga4_hometech_ceran__refactor_aligned
 
@@ -15,8 +17,6 @@ left:
 right:
   namespace: audit
   object: dev_audit__ga4_hometech_ceran__refactor_aligned
-
-join_key_mode: all_dimensions
 
 columns:
   mode: all_common

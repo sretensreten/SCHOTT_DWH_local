@@ -15,7 +15,7 @@ BASE = Path("DWH") / "data_comparation"
 CONFIG_DIR = BASE / "config"
 RESULT_DIR = BASE / "outputs" / "comparison_results"
 REPORT_DIR = BASE / "outputs" / "reports"
-VERSION = "provider-architecture-20260805_03"
+VERSION = "provider-architecture-20260805_07"
 
 
 def ask(label: str, default: str = "") -> str:
@@ -35,40 +35,104 @@ def choose(title: str, items: List[Any], show=lambda x: str(x), multi: bool = Fa
     print(f"\n{title}\n{'=' * len(title)}")
     for i, item in enumerate(items, 1):
         print(f"[{i}] {show(item)}")
-    raw = input("Selection: ").strip()
-    if not raw or raw.lower() in {"q", "quit"}:
-        return []
-    if multi and raw.lower() == "all":
-        return items
-    indexes = []
-    for part in raw.split(","):
-        part = part.strip()
-        if "-" in part:
-            a, b = [int(x) for x in part.split("-", 1)]
-            indexes.extend(range(a, b + 1))
-        else:
-            indexes.append(int(part))
-    return [items[i - 1] for i in indexes]
+    while True:
+        raw = input("Selection: ").strip()
+        if not raw or raw.lower() in {"q", "quit"}:
+            return []
+        if multi and raw.lower() == "all":
+            return items
+        try:
+            indexes = []
+            for part in raw.split(","):
+                part = part.strip()
+                if "-" in part:
+                    a, b = [int(x) for x in part.split("-", 1)]
+                    indexes.extend(range(a, b + 1))
+                else:
+                    indexes.append(int(part))
+            if not multi and len(indexes) != 1:
+                raise ValueError("Choose exactly one item.")
+            if any(i < 1 or i > len(items) for i in indexes):
+                raise ValueError(f"Choose a number between 1 and {len(items)}.")
+            return [items[i - 1] for i in indexes]
+        except ValueError as exc:
+            print(f"Invalid selection: {exc}")
 
+
+def resolve_comparison_config(config: Dict[str, Any], left: Any, right: Any) -> Dict[str, Any]:
+    mode = str(config.get("join_key_mode", "manual")).lower()
+    if mode == "manual":
+        return config
+    if mode == "all_values":
+        resolved = dict(config)
+        resolved["comparison_mode"] = "rowset"
+        resolved["join_keys"] = []
+        resolved.pop("aggregate_measures", None)
+        return resolved
+    if mode != "all_dimensions":
+        raise ValueError(f"Unsupported join_key_mode '{mode}'.")
+
+    measures = [str(x) for x in config.get("aggregate_measures", [])]
+    if not measures:
+        raise ValueError("aggregate_measures is required for all_dimensions mode.")
+    ls = {c.name.lower(): c for c in left.columns}
+    rs = {c.name.lower(): c for c in right.columns}
+    excluded = {str(x).lower() for x in (config.get("columns", {}) or {}).get("exclude", [])}
+    numeric = {"INT64", "INTEGER", "FLOAT", "FLOAT64", "NUMERIC", "BIGNUMERIC"}
+    dimensions_types = {"STRING", "DATE", "DATETIME", "TIME", "TIMESTAMP", "BOOL", "BOOLEAN"}
+    resolved_measures, errors = [], []
+    for name in measures:
+        l, r = ls.get(name.lower()), rs.get(name.lower())
+        if not l or not r:
+            errors.append(f"Aggregate measure '{name}' is missing on one side.")
+        elif l.data_type != r.data_type or l.mode != r.mode:
+            errors.append(f"Aggregate measure '{name}' has incompatible type or mode.")
+        elif l.data_type.upper() not in numeric:
+            errors.append(f"Aggregate measure '{name}' must be numeric.")
+        elif name.lower() in excluded:
+            errors.append(f"Aggregate measure '{name}' is also excluded.")
+        else:
+            resolved_measures.append(l.name)
+    measure_names={x.lower() for x in resolved_measures}
+    dimensions=[]; automatic=[]
+    for key in sorted(ls.keys() & rs.keys()):
+        l,r=ls[key],rs[key]
+        if key in excluded or key in measure_names or l.data_type != r.data_type or l.mode != r.mode:
+            continue
+        if l.comparable and r.comparable and l.mode.upper() != "REPEATED" and l.data_type.upper() in dimensions_types:
+            dimensions.append(l.name)
+        else:
+            automatic.append(l.name)
+    if not dimensions: errors.append("No shared dimensions remain.")
+    if errors: raise ValueError(" ".join(errors))
+    resolved=dict(config); resolved["join_keys"]=dimensions; resolved["aggregate_measures"]=resolved_measures
+    cols=dict(config.get("columns", {}) or {}); cols["exclude"]=list(dict.fromkeys(list(cols.get("exclude",[]) or [])+automatic)); resolved["columns"]=cols
+    return resolved
 
 def choose_object(provider: BigQueryProvider, label: str) -> Dict[str, Any] | None:
-    print(f"\nSelect {label} object")
-    print("[1] Search name across all datasets")
-    print("[2] Browse one dataset")
-    mode = ask("Selection", "1")
-    if mode == "1":
-        text = ask("Object name contains")
-        ds_text = ask("Dataset name contains (optional)")
-        objects = provider.search_objects(text, ds_text)
-    else:
-        datasets = choose("Choose dataset", provider.list_namespaces())
-        if not datasets:
-            return None
-        text = ask("Object name contains (optional)")
-        objects = [x for x in provider.list_objects(datasets[0]) if text.lower() in x["name"].lower()]
-    selected = choose(f"Choose {label} table/view", objects, lambda x: f"{x['namespace']}.{x['name']} | {x['object_type']}")
-    return selected[0] if selected else None
-
+    while True:
+        print(f"\nSelect {label} object")
+        print("[1] Search across all datasets")
+        print("[2] Browse one dataset")
+        print("[Q] Cancel")
+        mode = ask("Selection", "1").lower()
+        if mode in {"q", "quit"}: return None
+        if mode == "1":
+            text = ask("Object name contains (optional)")
+            ds_text = ask("Dataset name contains (optional)")
+            objects = provider.search_objects(text, ds_text)
+        elif mode == "2":
+            ds_text = ask("Dataset name contains (optional)")
+            datasets = [x for x in provider.list_namespaces() if not ds_text or ds_text.lower() in x.lower()]
+            selected = choose("Choose dataset", datasets)
+            if not selected: continue
+            text = ask("Object name contains (optional)")
+            objects = [x for x in provider.list_objects(selected[0]) if not text or text.lower() in x["name"].lower()]
+        else:
+            print("Invalid selection."); continue
+        selected = choose(f"Choose {label} table/view", objects, lambda x: f"{x['namespace']}.{x['name']} | {x['object_type']}")
+        if selected: return selected[0]
+        print("Nothing selected. Try again or cancel.")
 
 def wizard() -> Path | None:
     provider = BigQueryProvider({"project_env": "GCP_PROJECT_ID", "connection": {"env_file": ".env"}})
@@ -82,28 +146,23 @@ def wizard() -> Path | None:
     common = [ls[k] for k in sorted(ls.keys() & rs.keys()) if ls[k].data_type == rs[k].data_type and ls[k].mode == rs[k].mode]
     technical = [c.name for c in common if any(x in c.name.lower() for x in ["load", "batch", "etl", "insert", "update", "audit", "run_id"])]
     excluded = technical if technical and yes_no(f"Exclude detected technical columns ({', '.join(technical)})?", True) else []
-
-    print("\nJoin key mode")
-    print("============= ")
-    print("[1] Select join key field(s) manually")
-    print("[2] Use all shared dimension fields automatically")
-    join_key_mode = "all_dimensions" if ask("Selection", "1") == "2" else "manual"
+    print("\nJoin key mode\n=============")
+    print("[1] Select join keys manually")
+    print("[2] Group dimensions and SUM selected measures")
+    print("[3] Compare all compatible common values")
+    choice = ask("Selection", "1")
+    join_key_mode = {"2":"all_dimensions", "3":"all_values"}.get(choice, "manual")
+    keys=[]; aggregate_measures=[]
     if join_key_mode == "manual":
-        keys = choose("Choose unique join key field(s)", common, lambda c: f"{c.name} | {c.data_type} | {c.mode}", multi=True)
-        if not keys:
-            print("Join key is required.")
-            return None
+        keys=choose("Choose unique join key field(s)", common, lambda c: f"{c.name} | {c.data_type} | {c.mode}", multi=True)
+        if not keys: print("Join key is required."); return None
+    elif join_key_mode == "all_dimensions":
+        numeric={"INT64","INTEGER","FLOAT","FLOAT64","NUMERIC","BIGNUMERIC"}
+        measures=choose("Choose measures to SUM", [c for c in common if c.data_type.upper() in numeric and c.name.lower() not in {x.lower() for x in excluded}], lambda c:f"{c.name} | {c.data_type} | {c.mode}", multi=True)
+        if not measures: print("At least one measure is required."); return None
+        aggregate_measures=[c.name for c in measures]
     else:
-        dimension_types = {"STRING", "DATE", "DATETIME", "TIME", "TIMESTAMP", "BOOL", "BOOLEAN"}
-        excluded_names = {name.lower() for name in excluded}
-        keys = [c for c in common if c.data_type.upper() in dimension_types and c.name.lower() not in excluded_names]
-        if not keys:
-            print("No shared dimension fields are available after exclusions.")
-            return None
-        print("\nAutomatically selected dimension fields:")
-        for key in keys:
-            print(f"- {key.name} | {key.data_type} | {key.mode}")
-
+        print(f"All-values mode will compare {len(common)-len(excluded)} compatible common columns.")
     date_common = [c for c in common if c.data_type in {"DATE", "DATETIME", "TIMESTAMP"}]
     date_filter = {}
     if date_common and yes_no("Apply date filter?", True):
@@ -129,6 +188,7 @@ def wizard() -> Path | None:
         "left": {"namespace": left.schema, "object": left.name},
         "right": {"namespace": right.schema, "object": right.name},
         "join_keys": [x.name for x in keys] if join_key_mode == "manual" else [],
+        **({"aggregate_measures": aggregate_measures} if join_key_mode == "all_dimensions" else {}),
         "columns": {"mode": "all_common", "include": [], "exclude": excluded},
         "filters": filters,
         "date_filter": {k: v for k, v in date_filter.items() if v},
@@ -172,8 +232,13 @@ def execute(paths: List[Path], html: bool) -> int:
             left_cfg, right_cfg = cfg["left"], cfg["right"]
             left = provider.get_object(left_cfg.get("namespace") or left_cfg.get("dataset"), left_cfg["object"])
             right = provider.get_object(right_cfg.get("namespace") or right_cfg.get("dataset"), right_cfg["object"])
-            plan = schema_plan(left, right, cfg)
-            item.update({"left_object": f"{left.catalog}.{left.schema}.{left.name}", "right_object": f"{right.catalog}.{right.schema}.{right.name}", "left_object_type": left.object_type, "right_object_type": right.object_type, "join_key_mode": plan.get("join_key_mode"), "join_keys": plan.get("join_keys"), "schema": plan, "schema_status": plan["schema_status"], "key_status": "FAILED" if plan["blockers"] else "PENDING", "data_status": "NOT_RUN"})
+            cfg = resolve_comparison_config(cfg, left, right)
+            planning_cfg = cfg
+            if str(cfg.get("join_key_mode", "manual")).lower() == "all_values":
+                planning_cfg = dict(cfg)
+                planning_cfg["join_key_mode"] = "manual"
+            plan = schema_plan(left, right, planning_cfg)
+            item.update({"left_object": f"{left.catalog}.{left.schema}.{left.name}", "right_object": f"{right.catalog}.{right.schema}.{right.name}", "left_object_type": left.object_type, "right_object_type": right.object_type, "join_key_mode": cfg.get("join_key_mode", "manual"), "join_keys": plan.get("join_keys"), "schema": plan, "schema_status": plan["schema_status"], "key_status": "FAILED" if plan["blockers"] else "PENDING", "data_status": "NOT_RUN"})
             if plan["blockers"]:
                 item["execution_status"] = "BLOCKED_SCHEMA_OR_KEY"
                 item["errors"] = plan["blockers"]
@@ -186,8 +251,15 @@ def execute(paths: List[Path], html: bool) -> int:
                 result = execution.get("result")
                 if result:
                     item["key_validation"] = {k: result.get(k) for k in ["left_null_key_count", "right_null_key_count", "left_duplicate_key_count", "right_duplicate_key_count", "left_duplicate_samples", "right_duplicate_samples"]}
-                    key_bad = any(int(result.get(k) or 0) for k in ["left_null_key_count", "right_null_key_count", "left_duplicate_key_count", "right_duplicate_key_count"])
-                    item["key_status"] = "FAILED" if key_bad else "PASSED"
+                    mode = str(cfg.get("join_key_mode", "manual")).lower()
+                    if mode == "all_values":
+                        key_bad = False
+                        item["key_status"] = "FULL_ROW_COMPARISON"
+                    else:
+                        fields = ["left_duplicate_key_count", "right_duplicate_key_count"]
+                        if mode != "all_dimensions": fields = ["left_null_key_count", "right_null_key_count", *fields]
+                        key_bad = any(int(result.get(k) or 0) for k in fields)
+                        item["key_status"] = "FAILED" if key_bad else "PASSED"
                     if key_bad:
                         item["execution_status"] = "BLOCKED_INVALID_KEY"
                         item["data_status"] = "NOT_RUN"
