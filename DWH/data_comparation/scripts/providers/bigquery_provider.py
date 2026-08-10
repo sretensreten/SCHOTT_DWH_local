@@ -160,6 +160,13 @@ class BigQueryProvider:
             for column, alias, _ in difference_definitions
         ]
         sample_difference_array = "ARRAY_CONCAT(" + ", ".join(sample_arrays) + ")" if sample_arrays else "[]"
+        sample_field_unions = "\n".join(
+            "UNION ALL\nSELECT 'FIELD_MISMATCH', COALESCE(l.__business_key, r.__business_key), "
+            f"'{column['name'].replace(chr(39), chr(39) * 2)}', "
+            f"CAST(l.{self.qi(column['name'])} AS STRING), CAST(r.{self.qi(column['name'])} AS STRING) "
+            f"FROM comparison WHERE __left_present AND __right_present AND {alias}"
+            for column, alias, _ in difference_definitions
+        )
         sample_limit = int(config.get("comparison_options", {}).get("sample", {}).get("max_problem_rows", 10))
         null_predicate = " OR ".join(f"{self.qi(key)} IS NULL" for key in keys)
 
@@ -232,15 +239,26 @@ field_counts AS (
   )
   WHERE difference_count > 0
 ),
+sample_rows AS (
+  SELECT 'MISSING_IN_LEFT' AS difference_type, r.__business_key AS business_key,
+         CAST(NULL AS STRING) AS field, CAST(NULL AS STRING) AS left_value, CAST(NULL AS STRING) AS right_value
+  FROM comparison WHERE NOT __left_present AND __right_present
+  UNION ALL
+  SELECT 'MISSING_IN_RIGHT', l.__business_key,
+         CAST(NULL AS STRING), CAST(NULL AS STRING), CAST(NULL AS STRING)
+  FROM comparison WHERE __left_present AND NOT __right_present
+  {sample_field_unions}
+),
+sample_ranked AS (
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY COALESCE(field, '__ROW_LEVEL__') ORDER BY business_key) AS sample_rank
+  FROM sample_rows
+),
 samples AS (
   SELECT ARRAY(
-    SELECT AS STRUCT
-      IF(NOT __left_present, 'MISSING_IN_LEFT', IF(NOT __right_present, 'MISSING_IN_RIGHT', 'FIELD_MISMATCH')) AS difference_type,
-      COALESCE(l.__business_key, r.__business_key) AS business_key,
-      IF(__left_present AND __right_present, {sample_difference_array}, []) AS differences
-    FROM comparison
-    WHERE NOT __left_present OR NOT __right_present OR ({any_difference})
-    LIMIT {sample_limit}
+    SELECT AS STRUCT difference_type, business_key,
+      IF(field IS NULL, [], [STRUCT(field, left_value, right_value)]) AS differences
+    FROM sample_ranked
+    WHERE sample_rank <= {sample_limit}
   ) AS values
 )
 SELECT left_stats.row_count AS left_row_count,
@@ -339,4 +357,5 @@ FROM metrics CROSS JOIN samples
         rows = list(self.client.query(sql, job_config=job_config).result(timeout=int(config.get("execution", {}).get("query_timeout_seconds", 900))))
         result = plain(rows[0]) if rows else {}
         return {"execution_status": "COMPLETED", "estimated_bytes": estimated, "max_bytes_billed": max_bytes, "result": result, "sqls": [{"name": "comparison_sql", "sql": sql}]}
+
 
